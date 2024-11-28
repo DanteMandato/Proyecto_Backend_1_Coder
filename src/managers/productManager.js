@@ -1,7 +1,6 @@
 import paths from "../utils/paths.js";
 import { readJsonFile, writeJsonFile, deleteFile } from "../utils/fileHandler.js";
 import { generateId } from "../utils/collectionHandler.js";
-import { convertToBoolean } from "../utils/converter.js";
 import ErrorManager from "./errorManager.js";
 
 export default class ProductManager {
@@ -32,6 +31,12 @@ export default class ProductManager {
         return product;
     }
 
+    async #isCodeDuplicate(code) {
+        this.#products = await this.getAll();
+        const duplicate = this.#products.some(product => product.code === code);
+        return duplicate;
+    }
+
     async getOneById(id) {
         try {
             return await this.#findOneById(id);
@@ -48,13 +53,17 @@ export default class ProductManager {
                 throw new ErrorManager("Faltan datos obligatorios", 400);
             }
 
+            if (await this.#isCodeDuplicate(code)) {
+                throw new ErrorManager("El código ya existe, debe ser único", 400);
+            }
+
             const newProduct = {
                 id: generateId(await this.getAll()),
                 title,
                 description,
                 code,
                 price: Number(price),
-                status:convertToBoolean(status),
+                status: status !== undefined ? Boolean(status) : true,
                 stock: Number(stock),
                 category,
                 thumbnails: file ? [file.filename] : []

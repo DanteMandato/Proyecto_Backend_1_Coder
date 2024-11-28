@@ -7,7 +7,7 @@ const productManager = new ProductManager();
 
 router.get("/", async (req, res) => {
     try {
-        const products = await productManager.getAll(req.query.limit);
+        const products = await productManager.getAll(req.query);
         res.status(200).json({ status: "success", payload: products });
     } catch (error) {
         res.status(error.code || 500).json({ status: "error", message: error.message });
@@ -23,9 +23,9 @@ router.get("/:id", async (req, res) => {
     }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", uploader.single("file"), async (req, res) => {
     try {
-        const product = await productManager.insertOne(req.body);
+        const product = await productManager.insertOne(req.body, req.file);
         res.status(201).json({ status: "success", payload: product });
     } catch (error) {
         res.status(error.code || 500).json({ status: "error", message: error.message });
@@ -34,8 +34,8 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", uploader.single("file"), async (req, res) => {
     try {
-        const updatedProduct = await productManager.updateOneById(req.params.id, req.body, req.file);
-        res.status(200).json({ status: "success", payload: updatedProduct });
+        const product = await productManager.updateOneById(req.params.id, req.body, req.file);
+        res.status(200).json({ status: "success", payload: product });
     } catch (error) {
         res.status(error.code || 500).json({ status: "error", message: error.message });
     }
@@ -44,7 +44,7 @@ router.put("/:id", uploader.single("file"), async (req, res) => {
 router.delete("/:id", async (req, res) => {
     try {
         await productManager.deleteOneById(req.params.id);
-        res.status(204).end();
+        res.status(200).json({ status: "success" });
     } catch (error) {
         res.status(error.code || 500).json({ status: "error", message: error.message });
     }
