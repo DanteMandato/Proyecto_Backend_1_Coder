@@ -1,53 +1,21 @@
 import { Router } from "express";
-import ProductManager from "../managers/productManager.js";
-import uploader from "../utils/uploader.js";
+import Product from "../models/product.model.js";
 
 const router = Router();
-const productManager = new ProductManager();
 
 router.get("/", async (req, res) => {
-    try {
-        const products = await productManager.getAll(req.query);
-        res.status(200).json({ status: "success", payload: products });
-    } catch (error) {
-        res.status(error.code || 500).json({ status: "error", message: error.message });
-    }
-});
+    const { limit = 10, page = 1, sort, query } = req.query;
 
-router.get("/:id", async (req, res) => {
-    try {
-        const product = await productManager.getOneById(req.params.id);
-        res.status(200).json({ status: "success", payload: product });
-    } catch (error) {
-        res.status(error.code || 500).json({ status: "error", message: error.message });
-    }
-});
+    const options = {
+        limit: Number(limit),
+        page: Number(page),
+        sort: sort === "asc" ? { price: 1 } : sort === "desc" ? { price: -1 } : {},
+    };
 
-router.post("/", uploader.single("file"), async (req, res) => {
-    try {
-        const product = await productManager.insertOne(req.body, req.file);
-        res.status(201).json({ status: "success", payload: product });
-    } catch (error) {
-        res.status(error.code || 500).json({ status: "error", message: error.message });
-    }
-});
+    const filter = query ? { $or: [{ category: query }, { status: query }] } : {};
 
-router.put("/:id", uploader.single("file"), async (req, res) => {
-    try {
-        const product = await productManager.updateOneById(req.params.id, req.body, req.file);
-        res.status(200).json({ status: "success", payload: product });
-    } catch (error) {
-        res.status(error.code || 500).json({ status: "error", message: error.message });
-    }
-});
-
-router.delete("/:id", async (req, res) => {
-    try {
-        await productManager.deleteOneById(req.params.id);
-        res.status(200).json({ status: "success" });
-    } catch (error) {
-        res.status(error.code || 500).json({ status: "error", message: error.message });
-    }
+    const products = await Product.paginate(filter, options);
+    res.json(products);
 });
 
 export default router;

@@ -1,7 +1,7 @@
 import paths from "../utils/paths.js";
 import { readJsonFile, writeJsonFile, deleteFile } from "../utils/fileHandler.js";
 import { generateId } from "../utils/collectionHandler.js";
-import ErrorManager from "./errorManager.js";
+import ErrorManager from "./ErrorManager.js";
 
 export default class ProductManager {
     #jsonFilename;
@@ -17,13 +17,13 @@ export default class ProductManager {
             this.#products = await readJsonFile(paths.files, this.#jsonFilename);
             return limit ? this.#products.slice(0, limit) : this.#products;
         } catch (error) {
-            throw new ErrorManager("Error al cargar los productos", error.code);
+            throw new ErrorManager("Error al cargar los productos", error.code || 500);
         }
     }
 
     async #findOneById(id) {
-        this.#products = await this.getAll();
-        const product = this.#products.find(p => p.id === Number(id));
+        const products = await this.getAll();
+        const product = products.find(p => p.id === Number(id));
 
         if (!product) {
             throw new ErrorManager("Producto no encontrado", 404);
@@ -32,9 +32,8 @@ export default class ProductManager {
     }
 
     async #isCodeDuplicate(code) {
-        this.#products = await this.getAll();
-        const duplicate = this.#products.some(product => product.code === code);
-        return duplicate;
+        const products = await this.getAll();
+        return products.some(product => product.code === code);
     }
 
     async getOneById(id) {
@@ -49,9 +48,12 @@ export default class ProductManager {
         try {
             const { title, description, code, price, status, stock, category } = data;
 
-            if (!title || !description || !code || price == null || stock == null || !category) {
-                throw new ErrorManager("Faltan datos obligatorios", 400);
-            }
+            if (!title) throw new ErrorManager("El campo 'title' es obligatorio", 400);
+            if (!description) throw new ErrorManager("El campo 'description' es obligatorio", 400);
+            if (!code) throw new ErrorManager("El campo 'code' es obligatorio", 400);
+            if (price == null || isNaN(price)) throw new ErrorManager("El campo 'price' es obligatorio y debe ser un número", 400);
+            if (stock == null || isNaN(stock)) throw new ErrorManager("El campo 'stock' es obligatorio y debe ser un número", 400);
+            if (!category) throw new ErrorManager("El campo 'category' es obligatorio", 400);
 
             if (await this.#isCodeDuplicate(code)) {
                 throw new ErrorManager("El código ya existe, debe ser único", 400);
@@ -75,21 +77,20 @@ export default class ProductManager {
             return newProduct;
         } catch (error) {
             if (file?.filename) await deleteFile(paths.images, file.filename);
-            throw new ErrorManager(error.message, error.code);
+            throw new ErrorManager(error.message, error.code || 500);
         }
     }
 
     async updateOneById(id, data, file) {
         try {
             const productFound = await this.#findOneById(id);
-            const updatedThumbnail = file ? file.filename : productFound.thumbnails[0];
 
             const updatedProduct = {
                 ...productFound,
                 ...data,
-                id: productFound.id,
                 price: data.price ? Number(data.price) : productFound.price,
                 stock: data.stock ? Number(data.stock) : productFound.stock,
+                status: data.status !== undefined ? Boolean(data.status) : productFound.status,
                 thumbnails: file ? [...productFound.thumbnails, file.filename] : productFound.thumbnails,
             };
 
@@ -97,14 +98,10 @@ export default class ProductManager {
             this.#products[index] = updatedProduct;
             await writeJsonFile(paths.files, this.#jsonFilename, this.#products);
 
-            if (file?.filename && updatedThumbnail !== productFound.thumbnails[0]) {
-                await deleteFile(paths.images, productFound.thumbnails[0]);
-            }
-
             return updatedProduct;
         } catch (error) {
             if (file?.filename) await deleteFile(paths.images, file.filename);
-            throw new ErrorManager(error.message, error.code);
+            throw new ErrorManager(error.message, error.code || 500);
         }
     }
 
@@ -121,7 +118,7 @@ export default class ProductManager {
             this.#products = this.#products.filter(p => p.id !== Number(id));
             await writeJsonFile(paths.files, this.#jsonFilename, this.#products);
         } catch (error) {
-            throw new ErrorManager(error.message, error.code);
+            throw new ErrorManager(error.message, error.code || 500);
         }
     }
 }
